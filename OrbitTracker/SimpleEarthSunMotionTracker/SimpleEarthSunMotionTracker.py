@@ -27,7 +27,9 @@ def trackEarthMotion(numberOfYears, numberOfSteps):
 
 	# Acceleration should be negative if the earth's position is greater than the sun's position,
 	# positive if the earth's position is less than the sun's position
-	ax[0] = G*M[1]/((X[1] - x[0])*np.abs(X[1] - x[0]))	
+	#ax[0] = G*M[1]/((X[1] - x[0])*np.abs(X[1] - x[0]))	
+	r = np.sqrt(x[0]**2 + y[0]**2 + z[0]**2)
+	ax[0] =  -G*M[1]/r**2 * x[0]/r
 
 	# Because both the earth and the sun start out at y, z = 0, 0, finding the acceleration in these
 	# directions is weird because r = 0, so this will be ignored for now
@@ -41,17 +43,21 @@ def trackEarthMotion(numberOfYears, numberOfSteps):
 
 		vx[i] = vx[i-1] + ax[i-1]*dt
 		vy[i] = vy[i-1] + ay[i-1]*dt
-		vz[i] = vz[i-1] + az[i-1]*dt;
+		vz[i] = vz[i-1] + az[i-1]*dt
 
+		r = np.sqrt(x[i]**2 + y[i]**2 + z[i]**2)
+		acc = G*M[1]/r**2;
 		#if(X[1] - x[i] == 0):
 		#	ax[i] = 0
 		#else:
-		ax[i] = G*M[1]/((X[1] - x[i])*np.abs(X[1] - x[i]))		
+		#ax[i] = G*M[1]/((X[1] - x[i])*np.abs(X[1] - x[i]))
+		ax[i] = acc * -x[i]/r	
 
 		#if(Y[1] - y[i] == 0):
 		#	ay[i] = 0
 		#else:
-		ay[i] = G*M[1]/((Y[1] - y[i])*np.abs(Y[1] - y[i]))
+		#ay[i] = G*M[1]/((Y[1] - y[i])*np.abs(Y[1] - y[i]))
+		ay[i] = acc * -y[i]/r
 
 		# I'm ignoring the z-component for now, just trying to get it to work in 2 dimensions first
 		#if(Z[1] - z[i] == 0):
@@ -61,7 +67,7 @@ def trackEarthMotion(numberOfYears, numberOfSteps):
 
 	return x, y, z, vx, vy, vz, ax, ay, az
 
-x_arr, y_arr, z_arr, vx_arr, vy_arr, vz_arr, ax_arr, ay_arr, az_arr = trackEarthMotion(0.0001, 100)
+x_arr, y_arr, z_arr, vx_arr, vy_arr, vz_arr, ax_arr, ay_arr, az_arr = trackEarthMotion(0.5, 100)
 print("***********X Position**********")
 print(x_arr)	    
 print("***********Y Position**********")
