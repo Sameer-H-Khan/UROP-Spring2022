@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>29853d4f-3cd0-4700-8741-c673f214ecde</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>SimpleEarthSunMotionTracker.py</StartupFile>
+    <StartupFile>OrbitTracker.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -21,7 +21,10 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="SimpleEarthSunMotionTracker.py" />
+    <Compile Include="AstronomicalBody.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="OrbitTracker.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="InitialConditions.txt" />
