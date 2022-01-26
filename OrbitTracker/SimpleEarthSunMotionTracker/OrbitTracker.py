@@ -10,9 +10,37 @@ M, X, Y, Z, VX, VY, VZ = np.loadtxt("InitialConditions.txt", unpack = True)
 G = 6.67408e-8
 N = 100000
 
-
 earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], VY[0], VZ[0])
 sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
+
+# The position and velocity of l1 depends on the position and velocity of earth. Thus, values will be generated here
+earth_r = np.sqrt(X[0]**2 + Y[0]**2 + Z[0]**2)
+
+l1_r = earth_r - np.cbrt(M[0]/(3*M[1])) * earth_r
+
+l1_x = X[0] * l1_r/earth_r
+l1_y = Y[0] * l1_r/earth_r
+l1_z = Z[0] * l1_r/earth_r
+
+l1_vx = 0
+l1_vy = 0
+l1_vz = 0
+
+if X[0] != 0:					# w = earth_v/earth_r
+	l1_vx = VX[0]/X[0] * l1_x	# l1_v = w * l1_r
+if Y[0] != 0:					# l1_v = (earth_v/earth_r) * l1_r
+	l1_vy = VY[0]/Y[0] * l1_y
+if Z[0] != 0:
+	l1_vz = VZ[0]/Z[0] * l1_z
+
+print("l1_x: ", l1_x)
+print("l1_y: ", l1_y)
+print("l1_z: ", l1_z)
+print("l1_vx: ", l1_vx)
+print("l1_vy: ", l1_vy)
+print("l1_vz: ", l1_vz)
+
+l1 = Body(0, N, l1_x, l1_y, l1_z, l1_vx, l1_vy, l1_vz)
 l1 = Body(M[2], N, X[2], Y[2], Z[2], VX[2], VY[2], VZ[2])
 
 bodies = np.array([earth, sun, l1])
