@@ -3,18 +3,18 @@ import matplotlib
 import matplotlib.pyplot as plt
 from AstronomicalBody import Body
 
+G = 6.67408e-8
+N = 100000
+Years = 1.99
+
 # The following values are for mass, position components, and velocity components
 # Values for earth are at index 0, values for sun are at index 1, l1 at 2
 M, X, Y, Z, VX, VY, VZ = np.loadtxt("InitialConditions.txt", unpack = True)
 
-G = 6.67408e-8
-N = 100000
-Years = 9.99
-
 earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], VY[0], VZ[0])
 sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
 
-# The position and velocity of l1 depends on the position and velocity of earth. Thus, values will be generated here
+# The position and velocity of l1 and l2 depends on the position and velocity of earth. Thus, values will be generated here
 earth_r = np.sqrt(X[0]**2 + Y[0]**2 + Z[0]**2)
 
 l1_r = earth_r - np.cbrt(M[0]/(3*M[1])) * earth_r
@@ -43,11 +43,26 @@ print("l1_vz: ", l1_vz)
 print("")
 
 l1 = Body(0, N, l1_x, l1_y, l1_z, l1_vx, l1_vy, l1_vz)
-#l1 = Body(M[2], N, X[2], Y[2], Z[2], VX[2], VY[2], VZ[2])
-# Also add l2
 l2 = Body(0, N, l2_x, l2_y, l2_z, l2_vx, l2_vy, l2_vz)
 
 bodies = np.array([earth, sun, l1, l2])
+
+
+### Comment out these lines if not using Nasa Data ###
+#M, X, Y, Z, VX, VY, VZ = np.loadtxt("Nasa_ICs.txt", unpack = True)
+#M *= 10**3
+#X *= 10**5; Y *= 10**5; Z *= 10**5; VX *= 10**5; VY *= 10**5; VZ *= 10**5;
+
+#earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], VY[0], VZ[0])
+#sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
+#l1 = Body(M[2], N, X[2], Y[2], Z[2], VX[2], VY[2], VZ[2])
+#l2 = Body(M[3], N, X[3], Y[3], Z[3], VX[3], VY[3], VZ[3])
+#jupiter = Body(M[4], N, X[4], Y[4], Z[4], VX[4], VY[4], VZ[4])
+#moon = Body(M[5], N, X[5], Y[5], Z[5], VX[5], VY[5], VZ[5])
+
+#bodies = np.array([earth, sun, l1, l2, jupiter, moon])
+### End of Nasa Data ###
+
 
 # calculate center of mass
 x_center = 0
@@ -75,7 +90,9 @@ for body in bodies:
 
 ### Define a function to track motion using leapfrog algorithm ###
 def trackMotion(years, nsteps):
-	tf = years * 2*np.pi*np.sqrt(earth.x[0]**3/G/M[1])
+	print(earth.x[0]**3/G/M[1])
+	#tf = years * 2*np.pi*np.sqrt(earth.x[0]**3/G/M[1])
+	tf = years * 2*np.pi*np.sqrt(np.sqrt(earth.x[0]**2 + earth.y[0]**2 + earth.z[0]**2)**3/G/M[1])
 	dt = tf / nsteps
 
 	# Calculating initial acceleration
@@ -120,10 +137,11 @@ def trackMotion(years, nsteps):
 trackMotion(Years, N)
 
 plot1 = plt.figure(1)
-plt.scatter(earth.x, earth.y, s=1)
-plt.scatter(sun.x, sun.y, s=1)
-plt.scatter(l1.x, l1.y, s=1)
-plt.scatter(l2.x, l2.y, s=1)
+plt.scatter(earth.x, earth.y, s=1, label='earth')
+plt.scatter(sun.x, sun.y, s=1, label='sun')
+plt.scatter(l1.x, l1.y, s=1, label='l1')
+plt.scatter(l2.x, l2.y, s=1, label='l2')
+plt.legend(loc=1)
 
 plot2 = plt.figure(2)
 graph1 = plt.axes(projection = '3d')
