@@ -5,17 +5,21 @@ from AstronomicalBody import Body
 
 G = 6.67408e-8
 N = 100000
-Years = 1.99
+Years = 1
 
 # The following values are for mass, position components, and velocity components
 # Values for earth are at index 0, values for sun are at index 1, l1 at 2
 M, X, Y, Z, VX, VY, VZ = np.loadtxt("InitialConditions.txt", unpack = True)
 
-earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], VY[0], VZ[0])
+vy_init = np.sqrt(G*M[1]/X[0])
+print(vy_init/1e5)
+VY[0] = vy_init
+
+earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
 sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
 
 # The position and velocity of l1 and l2 depends on the position and velocity of earth. Thus, values will be generated here
-earth_r = np.sqrt(X[0]**2 + Y[0]**2 + Z[0]**2)
+earth_r = np.sqrt((X[0]-X[1])**2 + (Y[0]-Y[1])**2 + (Z[0]-Z[1])**2)
 
 l1_r = earth_r - np.cbrt(M[0]/(3*M[1])) * earth_r
 l2_r = earth_r + np.cbrt(M[0]/(3*M[1])) * earth_r
@@ -48,10 +52,11 @@ l2 = Body(0, N, l2_x, l2_y, l2_z, l2_vx, l2_vy, l2_vz)
 bodies = np.array([earth, sun, l1, l2])
 
 
-### Comment out these lines if not using Nasa Data ###
+### Comment out these lines if not using Nasa Data ### Data taken from 2022-01-12
 #M, X, Y, Z, VX, VY, VZ = np.loadtxt("Nasa_ICs.txt", unpack = True)
 #M *= 10**3
 #X *= 10**5; Y *= 10**5; Z *= 10**5; VX *= 10**5; VY *= 10**5; VZ *= 10**5;
+#print(np.sqrt(VX[0]**2 + VY[0]**2 + VZ[0]**2))
 
 #earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], VY[0], VZ[0])
 #sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
@@ -65,32 +70,98 @@ bodies = np.array([earth, sun, l1, l2])
 
 
 # calculate center of mass
-x_center = 0
-y_center = 0
-z_center = 0
-M_tot = 0
-for body in bodies:
-	x_center += body.mass * body.x[0]
-	y_center += body.mass * body.y[0]
-	z_center += body.mass * body.z[0]
-	M_tot += body.mass
+#x_center = 0
+#y_center = 0
+#z_center = 0
+#M_tot = 0
+#for body in bodies:
+#	x_center += body.mass * body.x[0]
+#	y_center += body.mass * body.y[0]
+#	z_center += body.mass * body.z[0]
+#	M_tot += body.mass
 
-x_center /= M_tot
-y_center /= M_tot
-z_center /= M_tot
+#x_center /= M_tot
+#y_center /= M_tot
+#z_center /= M_tot
 
-print("Center of mass initial: ", x_center, y_center, z_center)
+#print("Center of mass initial: ", x_center, y_center, z_center)
+
+
+def centerMassAndVelocity(i):
+	x_center = 0
+	y_center = 0
+	z_center = 0
+
+	vx_center = 0
+	vy_center = 0
+	vz_center = 0
+
+	M_tot = 0
+	for body in bodies:
+		x_center += body.mass * body.x[i]
+		y_center += body.mass * body.y[i]
+		z_center += body.mass * body.z[i]
+
+		vx_center += body.mass * body.vx[i]
+		vy_center += body.mass * body.vy[i]
+		vz_center += body.mass * body.vz[i]
+		M_tot += body.mass
+
+	x_center /= M_tot
+	y_center /= M_tot
+	z_center /= M_tot
+
+	vx_center /= M_tot
+	vy_center /= M_tot
+	vz_center /= M_tot
+
+	return x_center, y_center, z_center, vx_center, vy_center, vz_center
+
+
+
+xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(0)
 
 # reset all positions according to center of mass
 for body in bodies:
-	body.x[0] -= x_center
-	body.y[0] -= y_center
-	body.z[0] -= z_center
+	body.x[0] -= xc
+	body.y[0] -= yc
+	body.z[0] -= zc
+
+	body.vx[0] -= vxc
+	body.vy[0] -= vyc
+	body.vz[0] -= vzc
+
+# Center velocity
+#vx_center = 0
+#vy_center = 0
+#vz_center = 0
+##M_tot = 0
+#for body in bodies:
+#	vx_center += body.mass * body.vx[0]
+#	vy_center += body.mass * body.vy[0]
+#	vz_center += body.mass * body.vz[0]
+#	#M_tot += body.mass
+
+#vx_center /= M_tot
+#vy_center /= M_tot
+#vz_center /= M_tot
+
+#print("Center of mass initial: ", x_center, y_center, z_center)
+
+# reset velocities according to center
+#for body in bodies:
+#	body.vx[0] -= vx_center
+#	body.vy[0] -= vy_center
+#	body.vz[0] -= vz_center
+
+xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(0)
+
+print("Center of mass initial: ", xc, yc, zc)
+print("Center of velocity initial: ", vxc, vyc, vzc)
 
 
 ### Define a function to track motion using leapfrog algorithm ###
 def trackMotion(years, nsteps):
-	print(earth.x[0]**3/G/M[1])
 	#tf = years * 2*np.pi*np.sqrt(earth.x[0]**3/G/M[1])
 	tf = years * 2*np.pi*np.sqrt(np.sqrt(earth.x[0]**2 + earth.y[0]**2 + earth.z[0]**2)**3/G/M[1])
 	dt = tf / nsteps
@@ -112,7 +183,7 @@ def trackMotion(years, nsteps):
 			body.tempy = body.y[i-1] + body.vy[i-1]*0.5*dt
 			body.tempz = body.z[i-1] + body.vz[i-1]*0.5*dt
 
-		# Calculatin acceleration at half step
+		# Calculating acceleration at half step
 		for body in bodies:
 			for otherBody in bodies:
 				if body != otherBody:
@@ -134,7 +205,13 @@ def trackMotion(years, nsteps):
 			body.z[i] = body.tempz + body.vz[i]*0.5*dt
 
 
+
 trackMotion(Years, N)
+
+xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(-1)
+print("Center of mass initial: ", xc, yc, zc)
+print("Center of velocity initial: ", vxc, vyc, vzc)
+
 
 plot1 = plt.figure(1)
 plt.scatter(earth.x, earth.y, s=1, label='earth')
@@ -150,27 +227,44 @@ graph1.plot3D(sun.x, sun.y, sun.z)
 graph1.plot3D(l1.x, l1.y, l1.z)
 graph1.plot3D(l2.x, l2.y, l2.z)
 
-# calculate center of mass
-x_center = 0
-y_center = 0
-z_center = 0
-#M_tot = 0
-for body in bodies:
-	x_center += body.mass * body.x[-1]
-	y_center += body.mass * body.y[-1]
-	z_center += body.mass * body.z[-1]
-	#M_tot += body.mass
+print(" ")
+print("**********Initially*********")
+print("L1 Acceleration:\t", l1.ax[0], l1.ay[0], l1.az[0])
+print("L2 Acceleration:\t", l2.ax[0], l2.ay[0], l2.az[0])
+print("Earth Acceleration:\t", earth.ax[0], earth.ay[0], earth.az[0])
+print(" ")
+print("L1 angular velocity:\t", l1.vy[0]/l1.x[0])
+print("L2 angular velocity:\t", l2.vy[0]/l2.x[0])
+print("Earth angular velocity:\t", earth.vy[0]/earth.x[0])
+print(" ")
+print("L1 centripetal acc:\t", l1.vy[0]**2/l1.x[0])
+print("L1 centripetal acc:\t", l2.vy[0]**2/l2.x[0])
+print("Earth centripetal acc:\t", earth.vy[0]**2/earth.x[0])
 
-x_center /= M_tot
-y_center /= M_tot
-z_center /= M_tot
 
-print("Center of mass final: ", x_center, y_center, z_center)
+print(" ")
+print("**********After ", Years, " years *********")
+print("L1 Acceleration:\t", l1.ax[-1], l1.ay[-1], l1.az[-1])
+print("L2 Acceleration:\t", l2.ax[-1], l2.ay[-1], l2.az[-1])
+print("Earth Acceleration:\t", earth.ax[-1], earth.ay[-1], earth.az[-1])
+print(" ")
+print("L1 angular velocity:\t", l1.vy[-1]/l1.x[-1])
+print("L2 angular velocity:\t", l2.vy[-1]/l2.x[-1])
+print("Earth angular velocity:\t", earth.vy[-1]/earth.x[-1])
+print(" ")
+print("L1 centripetal acc:\t", l1.vy[-1]**2/l1.x[-1])
+print("L1 centripetal acc:\t", l2.vy[-1]**2/l2.x[-1])
+print("Earth centripetal acc:\t", earth.vy[-1]**2/earth.x[-1])
 
-#print("x initial: ", earth.x[0])
-#print("x final: ", earth.x[-1])
-#print("y initial: ", earth.y[0])
-#print("y final: ", earth.y[-1])
+earth_radius_arr = np.sqrt(earth.x**2 + earth.y**2 + earth.z**2)
+earth_r_max = np.amax(earth_radius_arr)
+earth_r_min = np.amin(earth_radius_arr)
+print("")
+print("Earth radius max: ", earth_r_max)
+print("Earth radius min: ", earth_r_min)
+print("Difference:\t", earth_r_max - earth_r_min)
+print("Hill radius:\t", np.cbrt(M[0]/(3*M[1])) * earth_r)
+
 
 plt.show()
 
