@@ -23,3 +23,6 @@ class Body:
 
         self.x[0] = xi; self.y[0] = yi; self.z[0] = zi;
         self.vx[0] = vxi; self.vy[0] = vyi; self.vz[0] = vzi;
+
+    def getR(self):
+        return np.sqrt(self.x**2 + self.y**2 + self.z**2)
