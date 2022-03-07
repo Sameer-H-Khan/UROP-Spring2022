@@ -262,7 +262,8 @@ def distance_between_l1_start_and_end(l1Start):
 
 	r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
 
-	l1_vy = l1_x_initialGuess * np.sqrt(G*sun.mass/r_es**3)
+	#l1_vy = l1_x_initialGuess * np.sqrt(G*sun.mass/r_es**3)
+	l1_vy = l1Start * np.sqrt(G*sun.mass/r_es**3)
 	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
 
 	bodies = np.array([earth, sun, l1])
@@ -280,7 +281,8 @@ def distance_between_l2_start_and_end(l2Start):
 
 	r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
 
-	l2_vy = l2_x_initialGuess * np.sqrt(G*sun.mass/r_es**3)
+	#l2_vy = l2_x_initialGuess * np.sqrt(G*sun.mass/r_es**3)
+	l2_vy = l2Start * np.sqrt(G*sun.mass/r_es**3)
 	l2 = Body(0, N, l2Start, 0, 0, 0, l2_vy, 0)
 
 	bodies = np.array([earth, sun, l2])
@@ -290,6 +292,75 @@ def distance_between_l2_start_and_end(l2Start):
 	r_y = l2.y[-1] - earth.y[-1]
 	r_z = l2.z[-1] - earth.z[-1]
 	return np.sqrt(r_x**2 + r_y**2 + r_z**2)
+
+
+## A more specific version of trackMotion which also tracks the distance between earth and lagrange points throughout the orbit
+## Ideally, lagrangeGuess should be replaced with a vector with x, y, and z components, and find the difference in vectors when 
+## filling earthToLagrangeDrifts 
+def trackMotionAndDrifts(years, nsteps, bodies, lagrangeBody, lagrangeGuess):
+	#tf = years * 2*np.pi*np.sqrt(earth.x[0]**3/G/M[1])
+	tf = years * 2*np.pi*np.sqrt(np.sqrt((earth.x[0] - sun.x[0])**2 + (earth.y[0] - sun.y[0])**2 + (earth.z[0] - sun.z[0])**2)**3/G/M[1])
+	dt = tf / nsteps
+
+	earthToLagrangeDrifts = np.zeros(nsteps)
+
+	# Calculating initial acceleration
+	for body in bodies:
+		for otherBody in bodies:
+			if body != otherBody:
+				r = np.sqrt((body.x[0] - otherBody.x[0])**2 + (body.y[0] - otherBody.y[0])**2 + (body.z[0] - otherBody.z[0])**2)
+				body.ax[0] += -G*otherBody.mass/r**2 * (body.x[0] - otherBody.x[0])/r
+				body.ay[0] += -G*otherBody.mass/r**2 * (body.y[0] - otherBody.y[0])/r
+				body.az[0] += -G*otherBody.mass/r**2 * (body.z[0] - otherBody.z[0])/r
+	
+	for i in range(1, nsteps):
+		# Calculating position at half step
+		for body in bodies:
+			body.tempx = body.x[i-1] + body.vx[i-1]*0.5*dt
+			body.tempy = body.y[i-1] + body.vy[i-1]*0.5*dt
+			body.tempz = body.z[i-1] + body.vz[i-1]*0.5*dt
+
+		# Calculating acceleration at half step
+		for body in bodies:
+			for otherBody in bodies:
+				if body != otherBody:
+					r = np.sqrt((body.tempx - otherBody.tempx)**2 + (body.tempy - otherBody.tempy)**2 + (body.tempz - otherBody.tempz)**2)
+					body.ax[i] += -G*otherBody.mass/r**2 * (body.tempx - otherBody.tempx)/r
+					body.ay[i] += -G*otherBody.mass/r**2 * (body.tempy - otherBody.tempy)/r
+					body.az[i] += -G*otherBody.mass/r**2 * (body.tempz - otherBody.tempz)/r
+
+		# Calculating velocity
+		for body in bodies:
+			body.vx[i] = body.vx[i-1] + body.ax[i]*dt
+			body.vy[i] = body.vy[i-1] + body.ay[i]*dt
+			body.vz[i] = body.vz[i-1] + body.az[i]*dt
+
+		# Calculating position at full step
+		for body in bodies:
+			body.x[i] = body.tempx + body.vx[i]*0.5*dt
+			body.y[i] = body.tempy + body.vy[i]*0.5*dt
+			body.z[i] = body.tempz + body.vz[i]*0.5*dt
+
+		# Find the difference in position between earth and l1 and earth and l2
+		earthToLagrangeDrifts[i] = np.sqrt((lagrangeBody.x[i] - earth.x[i])**2 + (lagrangeBody.y[i] - earth.y[i])**2 + (lagrangeBody.z[i] - earth.z[i])**2) - lagrangeGuess
+
+	return earthToLagrangeDrifts
+
+
+def mean_l1_drifts_from_earth(l1Start):
+	earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
+	sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
+
+	r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
+
+	l1_vy = l1Start * np.sqrt(G*sun.mass/r_es**3)
+	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
+
+	bodies = np.array([earth, sun, l1])
+
+	earthToL1Drifts = trackMotionAndDrifts(Years, N, bodies, l1, l1Start)
+
+	return np.mean(earthToL1Drifts)
 
 
 hill_l1 = opt.brentq(force_on_l1, 1e+9, 1e+12)
@@ -318,9 +389,12 @@ l2_x_final = opt.brentq(distance_between_l2_start_and_end, l2_x_initialGuess - 0
 r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
 l1_vy = l1_x_final * np.sqrt(G*sun.mass/r_es**3)
 l2_vy = l2_x_final * np.sqrt(G*sun.mass/r_es**3)
+
 #l1_vy = l1_x * np.sqrt(G*sun.mass/(l1_x - sun.x[0])**3) # Should give the same values, but it's not
 #l2_vy = l2_x * np.sqrt(G*sun.mass/(l2_x - sun.x[0])**3)
 
+earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
+sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
 l1 = Body(0, N, l1_x_final, 0, 0, 0, l1_vy, 0)
 l2 = Body(0, N, l2_x_final, 0, 0, 0, l2_vy, 0)
 
@@ -427,5 +501,3 @@ plt.legend(loc=1)
 #graph1.plot3D(l2.x, l2.y, l2.z)
 
 plt.show()
-
-
