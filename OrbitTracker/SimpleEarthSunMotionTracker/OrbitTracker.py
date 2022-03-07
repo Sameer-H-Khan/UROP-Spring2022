@@ -378,7 +378,8 @@ print("earth.x + hill_l2:\t", earth.x[0] - hill_l2)
 l1_x_initialGuess = earth.x[0] - hill_l1
 l2_x_initialGuess = earth.x[0] + hill_l2
 
-l1_x_final = opt.brentq(distance_between_l1_start_and_end, l1_x_initialGuess - 0.2*l1_x_initialGuess, l1_x_initialGuess + 0.2*l1_x_initialGuess)
+#l1_x_final = opt.brentq(distance_between_l1_start_and_end, l1_x_initialGuess - 0.2*l1_x_initialGuess, l1_x_initialGuess + 0.2*l1_x_initialGuess)
+l1_x_final = opt.brentq(mean_l1_drifts_from_earth, l1_x_initialGuess - 0.1*l1_x_initialGuess, l1_x_initialGuess + 0.1*l1_x_initialGuess)
 l2_x_final = opt.brentq(distance_between_l2_start_and_end, l2_x_initialGuess - 0.2*l2_x_initialGuess, l2_x_initialGuess + 0.2*l2_x_initialGuess)
 
 
