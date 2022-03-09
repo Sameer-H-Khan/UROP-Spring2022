@@ -5,8 +5,8 @@ import scipy.optimize as opt
 from AstronomicalBody import Body
 
 G = 6.67408e-8
-N = 5000
-Years = 1
+N = 25000
+Years = 5
 
 earth_equ_radius = 637816000
 
@@ -400,24 +400,25 @@ def trackMotionAndRays(years, nsteps, bodies, earthBody, lagrangeBody, lagrangeG
 			body.z[i] = body.tempz + body.vz[i]*0.5*dt
 
 		# Find whether or not the object at the lagrange point blocked a ray from the sun to the earth
-		distance_from_lagrange_to_sun = np.sqrt((lagrangeBody.x[i] - sun.x[i])**2 + (lagrangeBody.y[i] - sun.y[i])**2 + (lagrangeBody.z[i] - sun.z[i])**2)
+		#distance_from_lagrange_to_sun = np.sqrt((lagrangeBody.x[i] - sun.x[i])**2 + (lagrangeBody.y[i] - sun.y[i])**2 + (lagrangeBody.z[i] - sun.z[i])**2)
 		distance_from_earth_to_sun = np.sqrt((earthBody.x[i] - sun.x[i])**2 + (earthBody.y[i] - sun.y[i])**2 + (earthBody.z[i] - sun.z[i])**2)
+		distance_from_earth_to_l1 = np.sqrt((earthBody.x[i] - lagrangeBody.x[i])**2 + (earthBody.y[i] - lagrangeBody.y[i])**2 + (earthBody.z[i] - lagrangeBody.z[i])**2)
 
-		r_l_hatX = (lagrangeBody.x[i] - sun.x[i]) / distance_from_lagrange_to_sun
-		r_l_hatY = (lagrangeBody.y[i] - sun.y[i]) / distance_from_lagrange_to_sun
-		r_l_hatZ = (lagrangeBody.z[i] - sun.z[i]) / distance_from_lagrange_to_sun
+		r_l_hatX = (lagrangeBody.x[i] - earthBody.x[i]) / distance_from_earth_to_l1
+		r_l_hatY = (lagrangeBody.y[i] - earthBody.y[i]) / distance_from_earth_to_l1
+		r_l_hatZ = (lagrangeBody.z[i] - earthBody.z[i]) / distance_from_earth_to_l1
 
-		r_e_hatX = (earthBody.x[i] - sun.x[i]) / distance_from_earth_to_sun
-		r_e_hatY = (earthBody.y[i] - sun.y[i]) / distance_from_earth_to_sun
-		r_e_hatZ = (earthBody.z[i] - sun.z[i]) / distance_from_earth_to_sun
+		r_s_hatX = (sun.x[i] - earthBody.x[i]) / distance_from_earth_to_sun
+		r_s_hatY = (sun.y[i] - earthBody.y[i]) / distance_from_earth_to_sun
+		r_s_hatZ = (sun.z[i] - earthBody.z[i]) / distance_from_earth_to_sun
 
-		rl_dot_re = r_l_hatX * r_e_hatX + r_l_hatY * r_e_hatY +  r_l_hatZ * r_e_hatZ
+		rl_dot_rs = r_l_hatX * r_s_hatX + r_l_hatY * r_s_hatY +  r_l_hatZ * r_s_hatZ
 		#if np.abs(rl_dot_re) > 1:
 			#print("dot product exceeds 1: ", rl_dot_re)
 
-		theta = np.arccos(max(min(rl_dot_re, 1), -1))
+		theta = np.arccos(max(min(rl_dot_rs, 1), -1))
 		#print("theta: ", theta)
-		theta_crit = np.arcsin(earth_equ_radius/distance_from_earth_to_sun)
+		#theta_crit = np.arcsin(earth_equ_radius/distance_from_earth_to_sun)
 
 		#if theta < theta_crit:
 		#	raysBlockedByLagrange[i] = 1
@@ -469,7 +470,7 @@ def sum_l1_blocks_of_light(l1Start):
 	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
 
 	bodies = np.array([earth, sun, l1])
-	raysBlockedByLagrange = trackMotionAndRays(Years, N, bodies, earth, l1, l1Start)
+	raysBlockedByLagrange = trackMotionAndRays(1, 5000, bodies, earth, l1, l1Start)
 	#print(-1 * np.mean(raysBlockedByLagrange))
 	#return -1 * np.sum(raysBlockedByLagrange)
 	return np.mean(raysBlockedByLagrange)
@@ -481,14 +482,14 @@ print("hill_l1:\t", hill_l1)
 print("sol/hill_l1.x:\t", hill_l1/earth.x[0])
 print("earth.x - hill_l1:\t", earth.x[0] - hill_l1)
 
-hill_l2 = opt.brentq(force_on_l2, 1e+9, 1e+12)
-print("")
-print("hill_l2:\t", hill_l2)
-print("sol/hill_l2.x:\t", hill_l2/earth.x[0])
-print("earth.x + hill_l2:\t", earth.x[0] - hill_l2)
+#hill_l2 = opt.brentq(force_on_l2, 1e+9, 1e+12)
+#print("")
+#print("hill_l2:\t", hill_l2)
+#print("sol/hill_l2.x:\t", hill_l2/earth.x[0])
+#print("earth.x + hill_l2:\t", earth.x[0] - hill_l2)
 
 l1_x_initialGuess = earth.x[0] - hill_l1
-l2_x_initialGuess = earth.x[0] + hill_l2
+#l2_x_initialGuess = earth.x[0] + hill_l2
 
 #l1_x_final = opt.brentq(distance_between_l1_start_and_end, l1_x_initialGuess - 0.2*l1_x_initialGuess, l1_x_initialGuess + 0.2*l1_x_initialGuess)
 #l1_x_final = opt.brentq(mean_l1_drifts_from_earth, l1_x_initialGuess - 0.1*l1_x_initialGuess, l1_x_initialGuess + 0.1*l1_x_initialGuess) # works pretty well
@@ -504,10 +505,16 @@ print(sum_l1_blocks_of_light(0.995*l1_x_initialGuess))
 print(sum_l1_blocks_of_light(l1_x_initialGuess))
 print(sum_l1_blocks_of_light(1.007*l1_x_initialGuess), "\n")
 
-l1_x_final = opt.brent(sum_l1_blocks_of_light, brack=(0.995*l1_x_initialGuess, l1_x_initialGuess, 1.007*l1_x_initialGuess))
-
+res = opt.brent(sum_l1_blocks_of_light, brack=(0.995*l1_x_initialGuess, l1_x_initialGuess, 1.007*l1_x_initialGuess), tol=1e-10, full_output=True)
+#print(res)
+#quit()
+l1_x_final = res[0]
+avg_angle = res[1]
+print("l1 x final: ", l1_x_final)
+print("best average angle: ", avg_angle)
+#quit()
 #l2_x_final = opt.brentq(distance_between_l2_start_and_end, l2_x_initialGuess - 0.2*l2_x_initialGuess, l2_x_initialGuess + 0.2*l2_x_initialGuess)
-l2_x_final = opt.brentq(mean_l2_drifts_from_earth, l2_x_initialGuess - 0.1*l2_x_initialGuess, l2_x_initialGuess + 0.1*l2_x_initialGuess)
+#l2_x_final = opt.brentq(mean_l2_drifts_from_earth, l2_x_initialGuess - 0.1*l2_x_initialGuess, l2_x_initialGuess + 0.1*l2_x_initialGuess)
 
 
 
@@ -516,7 +523,7 @@ l2_x_final = opt.brentq(mean_l2_drifts_from_earth, l2_x_initialGuess - 0.1*l2_x_
 # v = rw
 r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
 l1_vy = l1_x_final * np.sqrt(G*sun.mass/r_es**3)
-l2_vy = l2_x_final * np.sqrt(G*sun.mass/r_es**3)
+#l2_vy = l2_x_final * np.sqrt(G*sun.mass/r_es**3)
 
 #l1_vy = l1_x * np.sqrt(G*sun.mass/(l1_x - sun.x[0])**3) # Should give the same values, but it's not
 #l2_vy = l2_x * np.sqrt(G*sun.mass/(l2_x - sun.x[0])**3)
@@ -524,9 +531,9 @@ l2_vy = l2_x_final * np.sqrt(G*sun.mass/r_es**3)
 earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
 sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
 l1 = Body(0, N, l1_x_final, 0, 0, 0, l1_vy, 0)
-l2 = Body(0, N, l2_x_final, 0, 0, 0, l2_vy, 0)
+#l2 = Body(0, N, l2_x_final, 0, 0, 0, l2_vy, 0)
 
-bodies = np.array([earth, sun, l1, l2])
+bodies = np.array([earth, sun, l1])
 
 
 
@@ -542,88 +549,88 @@ print(" ")
 print("###############")
 print("Earth initial position:\t", earth.x[0], earth.y[0], earth.z[0])
 print("L1 initial position:\t", l1.x[0], l1.y[0], l1.z[0])
-print("L2 initial position:\t", l2.x[0], l2.y[0], l2.z[0])
+#print("L2 initial position:\t", l2.x[0], l2.y[0], l2.z[0])
 
 print("###############")
 print("Earth final position:\t", earth.x[-1], earth.y[-1], earth.z[-1])
 print("L1 final position:\t", l1.x[-1], l1.y[-1], l1.z[-1])
-print("L2 final position:\t", l2.x[-1], l2.y[-1], l2.z[-1])
+#print("L2 final position:\t", l2.x[-1], l2.y[-1], l2.z[-1])
 
 
-print(" ")
-print("**********Initially*********")
-print("L1 Acceleration:\t", l1.ax[0], l1.ay[0], l1.az[0])
-print("L2 Acceleration:\t", l2.ax[0], l2.ay[0], l2.az[0])
-print("Earth Acceleration:\t", earth.ax[0], earth.ay[0], earth.az[0])
-print(" ")
-print("L1 angular velocity:\t", l1.vy[0]/l1.x[0])
-print("L2 angular velocity:\t", l2.vy[0]/l2.x[0])
-print("Earth angular velocity:\t", earth.vy[0]/earth.x[0])
-print(" ")
-print("L1 centripetal acc:\t", l1.vy[0]**2/l1.x[0])
-print("L1 centripetal acc:\t", l2.vy[0]**2/l2.x[0])
-print("Earth centripetal acc:\t", earth.vy[0]**2/earth.x[0])
+#print(" ")
+#print("**********Initially*********")
+#print("L1 Acceleration:\t", l1.ax[0], l1.ay[0], l1.az[0])
+#print("L2 Acceleration:\t", l2.ax[0], l2.ay[0], l2.az[0])
+#print("Earth Acceleration:\t", earth.ax[0], earth.ay[0], earth.az[0])
+#print(" ")
+#print("L1 angular velocity:\t", l1.vy[0]/l1.x[0])
+#print("L2 angular velocity:\t", l2.vy[0]/l2.x[0])
+#print("Earth angular velocity:\t", earth.vy[0]/earth.x[0])
+#print(" ")
+#print("L1 centripetal acc:\t", l1.vy[0]**2/l1.x[0])
+#print("L1 centripetal acc:\t", l2.vy[0]**2/l2.x[0])
+#print("Earth centripetal acc:\t", earth.vy[0]**2/earth.x[0])
 
 
-print(" ")
-print("**********After ", Years, " years *********")
-print("L1 Acceleration:\t", l1.ax[-1], l1.ay[-1], l1.az[-1])
-print("L2 Acceleration:\t", l2.ax[-1], l2.ay[-1], l2.az[-1])
-print("Earth Acceleration:\t", earth.ax[-1], earth.ay[-1], earth.az[-1])
-print(" ")
-print("L1 angular velocity:\t", l1.vy[-1]/l1.x[-1])
-print("L2 angular velocity:\t", l2.vy[-1]/l2.x[-1])
-print("Earth angular velocity:\t", earth.vy[-1]/earth.x[-1])
-print(" ")
-print("L1 centripetal acc:\t", l1.vy[-1]**2/l1.x[-1])
-print("L1 centripetal acc:\t", l2.vy[-1]**2/l2.x[-1])
-print("Earth centripetal acc:\t", earth.vy[-1]**2/earth.x[-1])
+#print(" ")
+#print("**********After ", Years, " years *********")
+#print("L1 Acceleration:\t", l1.ax[-1], l1.ay[-1], l1.az[-1])
+#print("L2 Acceleration:\t", l2.ax[-1], l2.ay[-1], l2.az[-1])
+#print("Earth Acceleration:\t", earth.ax[-1], earth.ay[-1], earth.az[-1])
+#print(" ")
+#print("L1 angular velocity:\t", l1.vy[-1]/l1.x[-1])
+#print("L2 angular velocity:\t", l2.vy[-1]/l2.x[-1])
+#print("Earth angular velocity:\t", earth.vy[-1]/earth.x[-1])
+#print(" ")
+#print("L1 centripetal acc:\t", l1.vy[-1]**2/l1.x[-1])
+#print("L1 centripetal acc:\t", l2.vy[-1]**2/l2.x[-1])
+#print("Earth centripetal acc:\t", earth.vy[-1]**2/earth.x[-1])
 
-earth_radius_arr = np.sqrt(earth.x**2 + earth.y**2 + earth.z**2)
-earth_r_max = np.amax(earth_radius_arr)
-earth_r_min = np.amin(earth_radius_arr)
-print("")
-print("Earth radius max:\t", earth_r_max)
-print("Earth radius min:\t", earth_r_min)
-print("Max - min:\t", earth_r_max - earth_r_min)
-print("Hill radius:\t", np.cbrt(M[0]/(3*M[1])) * earth_r)
-print("Max - min is ", (earth_r_max - earth_r_min)/(np.cbrt(M[0]/(3*M[1])) * earth_r), " of hill radius")
+#earth_radius_arr = np.sqrt(earth.x**2 + earth.y**2 + earth.z**2)
+#earth_r_max = np.amax(earth_radius_arr)
+#earth_r_min = np.amin(earth_radius_arr)
+#print("")
+#print("Earth radius max:\t", earth_r_max)
+#print("Earth radius min:\t", earth_r_min)
+#print("Max - min:\t", earth_r_max - earth_r_min)
+#print("Hill radius:\t", np.cbrt(M[0]/(3*M[1])) * earth_r)
+#print("Max - min is ", (earth_r_max - earth_r_min)/(np.cbrt(M[0]/(3*M[1])) * earth_r), " of hill radius")
 
-
-print("")
-
-earth_v_dot_rhat = earth.vx * earth.x + earth.vy*earth.y + earth.vz + earth.z / earth.getR()
-temp_vx = earth.vx - earth_v_dot_rhat * earth.x / earth.getR()
-temp_vy = earth.vy - earth_v_dot_rhat * earth.y / earth.getR()
-temp_vz = earth.vz - earth_v_dot_rhat * earth.z / earth.getR()
-earth_v_tang = np.sqrt(temp_vx**2 + temp_vy**2 + temp_vz**2)
-
-earth_angular = earth_v_tang / earth.getR()
-print(earth_angular * 2*np.pi*np.sqrt(np.sqrt(earth.x[0]**2 + earth.y[0]**2 + earth.z[0]**2)**3/G/M[1]))
-#earth_angular = np.sqrt(earth.vx**2 + earth.vy**2 + earth.vz**2)/(np.sqrt(earth.x**2 + earth.y**2 + earth.z**2))
-print("Earth_angular min: ", np.min(earth_angular))
-print("Earth_angular max: ", np.max(earth_angular))
-print("")
-l1_angular = np.sqrt(l1.vx**2 + l1.vy**2 + l1.vz**2)/(np.sqrt(l1.x**2 + l1.y**2 + l1.z**2))
-print("l1_angular min: ", np.min(l1_angular))
-print("l1_angular max: ", np.max(l1_angular))
-print("")
-l2_angular = np.sqrt(l2.vx**2 + l2.vy**2 + l2.vz**2)/(np.sqrt(l2.x**2 + l2.y**2 + l2.z**2))
-print("l2_angular min: ", np.min(l2_angular))
-print("l2_angular max: ", np.max(l2_angular))
 
 #print("")
-#print("sun.ax:\t", sun.ax[::5000])
-#print("sun.ay:\t", sun.ay[::5000])
-#print("sun.az:\t", sun.az[::5000])
+
+#earth_v_dot_rhat = earth.vx * earth.x + earth.vy*earth.y + earth.vz + earth.z / earth.getR()
+#temp_vx = earth.vx - earth_v_dot_rhat * earth.x / earth.getR()
+#temp_vy = earth.vy - earth_v_dot_rhat * earth.y / earth.getR()
+#temp_vz = earth.vz - earth_v_dot_rhat * earth.z / earth.getR()
+#earth_v_tang = np.sqrt(temp_vx**2 + temp_vy**2 + temp_vz**2)
+
+#earth_angular = earth_v_tang / earth.getR()
+#print(earth_angular * 2*np.pi*np.sqrt(np.sqrt(earth.x[0]**2 + earth.y[0]**2 + earth.z[0]**2)**3/G/M[1]))
+##earth_angular = np.sqrt(earth.vx**2 + earth.vy**2 + earth.vz**2)/(np.sqrt(earth.x**2 + earth.y**2 + earth.z**2))
+#print("Earth_angular min: ", np.min(earth_angular))
+#print("Earth_angular max: ", np.max(earth_angular))
 #print("")
-#print("sun.vx:\t", sun.vx[::5000])
-#print("sun.vy:\t", sun.vy[::5000])
-#print("sun.vz:\t", sun.vz[::5000])
+#l1_angular = np.sqrt(l1.vx**2 + l1.vy**2 + l1.vz**2)/(np.sqrt(l1.x**2 + l1.y**2 + l1.z**2))
+#print("l1_angular min: ", np.min(l1_angular))
+#print("l1_angular max: ", np.max(l1_angular))
 #print("")
-#print("sun.x:\t", sun.x[::5000])
-#print("sun.y:\t", sun.y[::5000])
-#print("sun.z:\t", sun.z[::5000])
+#l2_angular = np.sqrt(l2.vx**2 + l2.vy**2 + l2.vz**2)/(np.sqrt(l2.x**2 + l2.y**2 + l2.z**2))
+#print("l2_angular min: ", np.min(l2_angular))
+#print("l2_angular max: ", np.max(l2_angular))
+
+##print("")
+##print("sun.ax:\t", sun.ax[::5000])
+##print("sun.ay:\t", sun.ay[::5000])
+##print("sun.az:\t", sun.az[::5000])
+##print("")
+##print("sun.vx:\t", sun.vx[::5000])
+##print("sun.vy:\t", sun.vy[::5000])
+##print("sun.vz:\t", sun.vz[::5000])
+##print("")
+##print("sun.x:\t", sun.x[::5000])
+##print("sun.y:\t", sun.y[::5000])
+##print("sun.z:\t", sun.z[::5000])
 
 plot1 = plt.figure(1)
 plt.scatter(earth.x, earth.y, s=1, label='earth')
