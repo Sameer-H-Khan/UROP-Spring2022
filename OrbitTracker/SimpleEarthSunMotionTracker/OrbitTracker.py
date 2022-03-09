@@ -5,9 +5,10 @@ import scipy.optimize as opt
 from AstronomicalBody import Body
 
 G = 6.67408e-8
-N = 100000
+N = 5000
 Years = 1
 
+earth_equ_radius = 637816000
 
 # The following values are for mass, position components, and velocity components
 # Values for earth are at index 0, values for sun are at index 1, l1 at 2
@@ -347,6 +348,89 @@ def trackMotionAndDrifts(years, nsteps, bodies, lagrangeBody, lagrangeGuess):
 	return earthToLagrangeDrifts
 
 
+
+## A more specific version of trackMotion which also tracks whether or not the object at the lagrange point
+## blocks a ray of light from the center of the sun to the earth. Returns an array of bits. 0 if the lagrange
+## point did not block the ray of light. 1 if the lagrange point did block the ray of light
+########## NOT SURE IF THIS WILL WORK IN 3D ##########
+def trackMotionAndRays(years, nsteps, bodies, earthBody, lagrangeBody, lagrangeGuess):
+	#tf = years * 2*np.pi*np.sqrt(earth.x[0]**3/G/M[1])
+	tf = years * 2*np.pi*np.sqrt(np.sqrt((earth.x[0] - sun.x[0])**2 + (earth.y[0] - sun.y[0])**2 + (earth.z[0] - sun.z[0])**2)**3/G/M[1])
+	dt = tf / nsteps
+
+	#raysBlockedByLagrange = np.zeros(nsteps)
+	#raysBlockedByLagrange[0] = 1
+	angles = np.zeros(nsteps)
+
+	# Calculating initial acceleration
+	for body in bodies:
+		for otherBody in bodies:
+			if body != otherBody:
+				r = np.sqrt((body.x[0] - otherBody.x[0])**2 + (body.y[0] - otherBody.y[0])**2 + (body.z[0] - otherBody.z[0])**2)
+				body.ax[0] += -G*otherBody.mass/r**2 * (body.x[0] - otherBody.x[0])/r
+				body.ay[0] += -G*otherBody.mass/r**2 * (body.y[0] - otherBody.y[0])/r
+				body.az[0] += -G*otherBody.mass/r**2 * (body.z[0] - otherBody.z[0])/r
+	
+	for i in range(1, nsteps):
+		# Calculating position at half step
+		for body in bodies:
+			body.tempx = body.x[i-1] + body.vx[i-1]*0.5*dt
+			body.tempy = body.y[i-1] + body.vy[i-1]*0.5*dt
+			body.tempz = body.z[i-1] + body.vz[i-1]*0.5*dt
+
+		# Calculating acceleration at half step
+		for body in bodies:
+			for otherBody in bodies:
+				if body != otherBody:
+					r = np.sqrt((body.tempx - otherBody.tempx)**2 + (body.tempy - otherBody.tempy)**2 + (body.tempz - otherBody.tempz)**2)
+					body.ax[i] += -G*otherBody.mass/r**2 * (body.tempx - otherBody.tempx)/r
+					body.ay[i] += -G*otherBody.mass/r**2 * (body.tempy - otherBody.tempy)/r
+					body.az[i] += -G*otherBody.mass/r**2 * (body.tempz - otherBody.tempz)/r
+
+		# Calculating velocity
+		for body in bodies:
+			body.vx[i] = body.vx[i-1] + body.ax[i]*dt
+			body.vy[i] = body.vy[i-1] + body.ay[i]*dt
+			body.vz[i] = body.vz[i-1] + body.az[i]*dt
+
+		# Calculating position at full step
+		for body in bodies:
+			body.x[i] = body.tempx + body.vx[i]*0.5*dt
+			body.y[i] = body.tempy + body.vy[i]*0.5*dt
+			body.z[i] = body.tempz + body.vz[i]*0.5*dt
+
+		# Find whether or not the object at the lagrange point blocked a ray from the sun to the earth
+		distance_from_lagrange_to_sun = np.sqrt((lagrangeBody.x[i] - sun.x[i])**2 + (lagrangeBody.y[i] - sun.y[i])**2 + (lagrangeBody.z[i] - sun.z[i])**2)
+		distance_from_earth_to_sun = np.sqrt((earthBody.x[i] - sun.x[i])**2 + (earthBody.y[i] - sun.y[i])**2 + (earthBody.z[i] - sun.z[i])**2)
+
+		r_l_hatX = (lagrangeBody.x[i] - sun.x[i]) / distance_from_lagrange_to_sun
+		r_l_hatY = (lagrangeBody.y[i] - sun.y[i]) / distance_from_lagrange_to_sun
+		r_l_hatZ = (lagrangeBody.z[i] - sun.z[i]) / distance_from_lagrange_to_sun
+
+		r_e_hatX = (earthBody.x[i] - sun.x[i]) / distance_from_earth_to_sun
+		r_e_hatY = (earthBody.y[i] - sun.y[i]) / distance_from_earth_to_sun
+		r_e_hatZ = (earthBody.z[i] - sun.z[i]) / distance_from_earth_to_sun
+
+		rl_dot_re = r_l_hatX * r_e_hatX + r_l_hatY * r_e_hatY +  r_l_hatZ * r_e_hatZ
+		#if np.abs(rl_dot_re) > 1:
+			#print("dot product exceeds 1: ", rl_dot_re)
+
+		theta = np.arccos(max(min(rl_dot_re, 1), -1))
+		#print("theta: ", theta)
+		theta_crit = np.arcsin(earth_equ_radius/distance_from_earth_to_sun)
+
+		#if theta < theta_crit:
+		#	raysBlockedByLagrange[i] = 1
+		#else:
+		#	raysBlockedByLagrange[i] = 0
+
+		angles[i] = theta
+
+	#return raysBlockedByLagrange
+	return angles
+
+
+
 def mean_l1_drifts_from_earth(l1Start):
 	earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
 	sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
@@ -357,10 +441,38 @@ def mean_l1_drifts_from_earth(l1Start):
 	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
 
 	bodies = np.array([earth, sun, l1])
-
 	earthToL1Drifts = trackMotionAndDrifts(Years, N, bodies, l1, l1Start)
-
 	return np.mean(earthToL1Drifts)
+
+
+def mean_l2_drifts_from_earth(l2Start):
+	earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
+	sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
+
+	r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
+
+	l2_vy = l2Start * np.sqrt(G*sun.mass/r_es**3)
+	l2 = Body(0, N, l2Start, 0, 0, 0, l2_vy, 0)
+
+	bodies = np.array([earth, sun, l2])
+	earthToL2Drifts = trackMotionAndDrifts(Years, N, bodies, l2, l2Start)
+	return np.mean(earthToL2Drifts)
+
+
+def sum_l1_blocks_of_light(l1Start):
+	earth = Body(M[0], N, X[0], Y[0], Z[0], VX[0], vy_init, VZ[0])
+	sun = Body(M[1], N, X[1], Y[1], Z[1], VX[1], VY[1], VZ[1])
+
+	r_es = np.sqrt((sun.x[0] - earth.x[0])**2 + (sun.y[0] - earth.y[0])**2 + (sun.z[0] - earth.z[0])**2)
+
+	l1_vy = l1Start * np.sqrt(G*sun.mass/r_es**3)
+	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
+
+	bodies = np.array([earth, sun, l1])
+	raysBlockedByLagrange = trackMotionAndRays(Years, N, bodies, earth, l1, l1Start)
+	#print(-1 * np.mean(raysBlockedByLagrange))
+	#return -1 * np.sum(raysBlockedByLagrange)
+	return np.mean(raysBlockedByLagrange)
 
 
 hill_l1 = opt.brentq(force_on_l1, 1e+9, 1e+12)
@@ -379,8 +491,23 @@ l1_x_initialGuess = earth.x[0] - hill_l1
 l2_x_initialGuess = earth.x[0] + hill_l2
 
 #l1_x_final = opt.brentq(distance_between_l1_start_and_end, l1_x_initialGuess - 0.2*l1_x_initialGuess, l1_x_initialGuess + 0.2*l1_x_initialGuess)
-l1_x_final = opt.brentq(mean_l1_drifts_from_earth, l1_x_initialGuess - 0.1*l1_x_initialGuess, l1_x_initialGuess + 0.1*l1_x_initialGuess)
-l2_x_final = opt.brentq(distance_between_l2_start_and_end, l2_x_initialGuess - 0.2*l2_x_initialGuess, l2_x_initialGuess + 0.2*l2_x_initialGuess)
+#l1_x_final = opt.brentq(mean_l1_drifts_from_earth, l1_x_initialGuess - 0.1*l1_x_initialGuess, l1_x_initialGuess + 0.1*l1_x_initialGuess) # works pretty well
+
+#result = opt.minimize(sum_l1_blocks_of_light, l1_x_initialGuess)
+#l1_x_final = result.x
+#number_of_steps_blocked = -1 * result.fun
+#number_of_steps_unblocked = N - number_of_steps_blocked
+#print("\nRatio of steps blocked to steps unblocked (higher is better):\t", number_of_steps_blocked/number_of_steps_unblocked, "\n")
+
+print("\n******** Testing sum_l1_blocks_of_light ***********")
+print(sum_l1_blocks_of_light(0.995*l1_x_initialGuess))
+print(sum_l1_blocks_of_light(l1_x_initialGuess))
+print(sum_l1_blocks_of_light(1.007*l1_x_initialGuess), "\n")
+
+l1_x_final = opt.brent(sum_l1_blocks_of_light, brack=(0.995*l1_x_initialGuess, l1_x_initialGuess, 1.007*l1_x_initialGuess))
+
+#l2_x_final = opt.brentq(distance_between_l2_start_and_end, l2_x_initialGuess - 0.2*l2_x_initialGuess, l2_x_initialGuess + 0.2*l2_x_initialGuess)
+l2_x_final = opt.brentq(mean_l2_drifts_from_earth, l2_x_initialGuess - 0.1*l2_x_initialGuess, l2_x_initialGuess + 0.1*l2_x_initialGuess)
 
 
 
@@ -410,6 +537,17 @@ trackMotion(Years, N)
 xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(-1)
 print("Center of mass final: ", xc, yc, zc)
 print("Center of velocity final: ", vxc, vyc, vzc)
+
+print(" ")
+print("###############")
+print("Earth initial position:\t", earth.x[0], earth.y[0], earth.z[0])
+print("L1 initial position:\t", l1.x[0], l1.y[0], l1.z[0])
+print("L2 initial position:\t", l2.x[0], l2.y[0], l2.z[0])
+
+print("###############")
+print("Earth final position:\t", earth.x[-1], earth.y[-1], earth.z[-1])
+print("L1 final position:\t", l1.x[-1], l1.y[-1], l1.z[-1])
+print("L2 final position:\t", l2.x[-1], l2.y[-1], l2.z[-1])
 
 
 print(" ")
@@ -490,8 +628,8 @@ print("l2_angular max: ", np.max(l2_angular))
 plot1 = plt.figure(1)
 plt.scatter(earth.x, earth.y, s=1, label='earth')
 plt.scatter(sun.x, sun.y, s=1, label='sun')
+#plt.scatter(l2.x, l2.y, s=1, label='l2')
 plt.scatter(l1.x, l1.y, s=1, label='l1')
-plt.scatter(l2.x, l2.y, s=1, label='l2')
 plt.legend(loc=1)
 
 #plot2 = plt.figure(2)
