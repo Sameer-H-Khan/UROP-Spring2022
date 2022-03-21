@@ -5,8 +5,8 @@ import scipy.optimize as opt
 from AstronomicalBody import Body
 
 G = 6.67408e-8
-N = 25000
-Years = 5
+N = 5000
+Years = 1
 
 earth_equ_radius = 637816000
 
@@ -238,7 +238,7 @@ def trackMotion(years, nsteps):
 		# Calculating acceleration at half step
 		for body in bodies:
 			for otherBody in bodies:
-				if body != otherBody:
+				if body != otherBody and otherBody.mass != 0:
 					r = np.sqrt((body.tempx - otherBody.tempx)**2 + (body.tempy - otherBody.tempy)**2 + (body.tempz - otherBody.tempz)**2)
 					body.ax[i] += -G*otherBody.mass/r**2 * (body.tempx - otherBody.tempx)/r
 					body.ay[i] += -G*otherBody.mass/r**2 * (body.tempy - otherBody.tempy)/r
@@ -324,7 +324,7 @@ def trackMotionAndDrifts(years, nsteps, bodies, lagrangeBody, lagrangeGuess):
 		# Calculating acceleration at half step
 		for body in bodies:
 			for otherBody in bodies:
-				if body != otherBody:
+				if body != otherBody and otherBody.mass != 0:
 					r = np.sqrt((body.tempx - otherBody.tempx)**2 + (body.tempy - otherBody.tempy)**2 + (body.tempz - otherBody.tempz)**2)
 					body.ax[i] += -G*otherBody.mass/r**2 * (body.tempx - otherBody.tempx)/r
 					body.ay[i] += -G*otherBody.mass/r**2 * (body.tempy - otherBody.tempy)/r
@@ -381,7 +381,7 @@ def trackMotionAndRays(years, nsteps, bodies, earthBody, lagrangeBody, lagrangeG
 		# Calculating acceleration at half step
 		for body in bodies:
 			for otherBody in bodies:
-				if body != otherBody:
+				if body != otherBody and otherBody.mass != 0:
 					r = np.sqrt((body.tempx - otherBody.tempx)**2 + (body.tempy - otherBody.tempy)**2 + (body.tempz - otherBody.tempz)**2)
 					body.ax[i] += -G*otherBody.mass/r**2 * (body.tempx - otherBody.tempx)/r
 					body.ay[i] += -G*otherBody.mass/r**2 * (body.tempy - otherBody.tempy)/r
@@ -394,7 +394,7 @@ def trackMotionAndRays(years, nsteps, bodies, earthBody, lagrangeBody, lagrangeG
 			body.vz[i] = body.vz[i-1] + body.az[i]*dt
 
 		# Calculating position at full step
-		for body in bodies:
+		for body in bodies: # func(bodies, timestep, currtime)
 			body.x[i] = body.tempx + body.vx[i]*0.5*dt
 			body.y[i] = body.tempy + body.vy[i]*0.5*dt
 			body.z[i] = body.tempz + body.vz[i]*0.5*dt
@@ -470,7 +470,7 @@ def sum_l1_blocks_of_light(l1Start):
 	l1 = Body(0, N, l1Start, 0, 0, 0, l1_vy, 0)
 
 	bodies = np.array([earth, sun, l1])
-	raysBlockedByLagrange = trackMotionAndRays(1, 5000, bodies, earth, l1, l1Start)
+	raysBlockedByLagrange = trackMotionAndRays(1, 5000, bodies, earth, l1, l1Start)							# Altering opimization paramters
 	#print(-1 * np.mean(raysBlockedByLagrange))
 	#return -1 * np.sum(raysBlockedByLagrange)
 	return np.mean(raysBlockedByLagrange)
@@ -505,7 +505,7 @@ print(sum_l1_blocks_of_light(0.995*l1_x_initialGuess))
 print(sum_l1_blocks_of_light(l1_x_initialGuess))
 print(sum_l1_blocks_of_light(1.007*l1_x_initialGuess), "\n")
 
-res = opt.brent(sum_l1_blocks_of_light, brack=(0.995*l1_x_initialGuess, l1_x_initialGuess, 1.007*l1_x_initialGuess), tol=1e-10, full_output=True)
+res = opt.brent(sum_l1_blocks_of_light, brack=(0.995*l1_x_initialGuess, l1_x_initialGuess, 1.007*l1_x_initialGuess), tol=1e-12, full_output=True)
 #print(res)
 #quit()
 l1_x_final = res[0]
@@ -535,11 +535,52 @@ l1 = Body(0, N, l1_x_final, 0, 0, 0, l1_vy, 0)
 
 bodies = np.array([earth, sun, l1])
 
+# Adding random tracer particles around l1
+for i in range(100):
+	radius = 100000
+	r = radius * ( np.random.random()**(1./3.) )  
+	phi = np.random.uniform(0,2*np.pi) 
+	costheta = np.random.uniform(-1,1) 
+	theta = np.arccos(costheta) 
+	x = r * np.sin(theta) * np.cos(phi) + l1_x_final
+	y = r * np.sin(theta) * np.sin(phi)
+	z = r * np.cos(theta)
 
+	point = Body(0, N, x, y, z, 0, l1_vy, 0)
+	bodies = np.append(bodies, point)
 
-#earth.mass = 1
-#M[0] = 1
 trackMotion(Years, N)
+
+blocks = np.zeros(N)
+for b in bodies:
+	for i in range(N):
+		if b != earth and b != sun and b != l1:
+			# Find whether or not the tracer particle blocked a ray from the sun to the earth
+			distance_from_earth_to_sun = np.sqrt((earth.x[i] - sun.x[i])**2 + (earth.y[i] - sun.y[i])**2 + (earth.z[i] - sun.z[i])**2)
+			distance_from_earth_to_tracer = np.sqrt((earth.x[i] - b.x[i])**2 + (earth.y[i] - b.y[i])**2 + (earth.z[i] - b.z[i])**2)
+
+			r_l_hatX = (b.x[i] - earth.x[i]) / distance_from_earth_to_tracer
+			r_l_hatY = (b.y[i] - earth.y[i]) / distance_from_earth_to_tracer
+			r_l_hatZ = (b.z[i] - earth.z[i]) / distance_from_earth_to_tracer
+
+			r_s_hatX = (sun.x[i] - earth.x[i]) / distance_from_earth_to_sun
+			r_s_hatY = (sun.y[i] - earth.y[i]) / distance_from_earth_to_sun
+			r_s_hatZ = (sun.z[i] - earth.z[i]) / distance_from_earth_to_sun
+
+			rl_dot_rs = r_l_hatX * r_s_hatX + r_l_hatY * r_s_hatY +  r_l_hatZ * r_s_hatZ
+			#if np.abs(rl_dot_re) > 1:
+				#print("dot product exceeds 1: ", rl_dot_re)
+
+			theta = np.arccos(max(min(rl_dot_rs, 1), -1))
+
+			if theta < 6.97e10 / distance_from_earth_to_sun:
+				blocks[i] += 1
+			#else:
+			#	blocks[i] = 0
+			#rad_sun/distbw earth and sun
+
+print("Printing blocks:")
+print(blocks[::100])
 
 xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(-1)
 print("Center of mass final: ", xc, yc, zc)
@@ -555,6 +596,8 @@ print("###############")
 print("Earth final position:\t", earth.x[-1], earth.y[-1], earth.z[-1])
 print("L1 final position:\t", l1.x[-1], l1.y[-1], l1.z[-1])
 #print("L2 final position:\t", l2.x[-1], l2.y[-1], l2.z[-1])
+
+print("\nTracer particles' starting positions")
 
 
 #print(" ")
@@ -633,17 +676,24 @@ print("L1 final position:\t", l1.x[-1], l1.y[-1], l1.z[-1])
 ##print("sun.z:\t", sun.z[::5000])
 
 plot1 = plt.figure(1)
-plt.scatter(earth.x, earth.y, s=1, label='earth')
-plt.scatter(sun.x, sun.y, s=1, label='sun')
+for b in bodies:
+	if b != earth and b != sun and b != l1:
+		plt.scatter(b.x, b.y, s = 1, c='gray')
+plt.scatter(earth.x, earth.y, s=2, label='earth')
+plt.scatter(sun.x, sun.y, s=2, label='sun')
 #plt.scatter(l2.x, l2.y, s=1, label='l2')
-plt.scatter(l1.x, l1.y, s=1, label='l1')
+plt.scatter(l1.x, l1.y, s=2, label='l1')
 plt.legend(loc=1)
 
-#plot2 = plt.figure(2)
-#graph1 = plt.axes(projection = '3d')
-#graph1.plot3D(earth.x, earth.y, earth.z)
-#graph1.plot3D(sun.x, sun.y, sun.z)
-#graph1.plot3D(l1.x, l1.y, l1.z)
-#graph1.plot3D(l2.x, l2.y, l2.z)
+plot2 = plt.figure(2)
+graph1 = plt.axes(projection = '3d')
+for b in bodies:
+	if b != earth and b != sun and b != l1:
+		graph1.plot3D(b.x, b.y, b.z, c='gray')
+		print("x: ", b.x[0] - l1.x[0], "\ty: ", b.y[0] - l1.y[0], " z: ", b.z[0])
+graph1.plot3D(earth.x, earth.y, earth.z)
+graph1.plot3D(sun.x, sun.y, sun.z)
+graph1.plot3D(l1.x, l1.y, l1.z)
 
+plt.savefig("C:/Users/khans/Desktop/UROP Spring 2022/plot.png")
 plt.show()
