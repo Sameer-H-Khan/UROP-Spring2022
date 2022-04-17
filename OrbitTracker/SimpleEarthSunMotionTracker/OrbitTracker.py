@@ -553,8 +553,8 @@ trackMotion(Years, N)
 
 blocks = np.zeros(N)
 for b in bodies:
-	for i in range(N):
-		if b != earth and b != sun and b != l1:
+	for i in range(N): 
+		if b != earth and b != sun and b != l1 and not b.covered:
 			# Find whether or not the tracer particle blocked a ray from the sun to the earth
 			distance_from_earth_to_sun = np.sqrt((earth.x[i] - sun.x[i])**2 + (earth.y[i] - sun.y[i])**2 + (earth.z[i] - sun.z[i])**2)
 			distance_from_earth_to_tracer = np.sqrt((earth.x[i] - b.x[i])**2 + (earth.y[i] - b.y[i])**2 + (earth.z[i] - b.z[i])**2)
@@ -575,12 +575,76 @@ for b in bodies:
 
 			if theta < 6.97e10 / distance_from_earth_to_sun:
 				blocks[i] += 1
-			#else:
-			#	blocks[i] = 0
-			#rad_sun/distbw earth and sun
+				#total_SA += SA_of_tracer
+
+			#for b2 in bodies:
+			#	if b2 != earth and b2 != sun and b2 != l1 and b2 != b:
+			#		# if b is overlapping other tracer, for now, don't add its SA to the total
+			#		distance_from_earth_to_tracer2 = np.sqrt((earth.x[i] - b2.x[i])**2 + (earth.y[i] - b2.y[i])**2 + (earth.z[i] - b2.z[i])**2)
+
+			#		r_b2_hatX = (b2.x[i] - earth.x[i]) / distance_from_earth_to_tracer2
+			#		r_b2_hatY = (b2.y[i] - earth.y[i]) / distance_from_earth_to_tracer2
+			#		r_b2_hatZ = (b2.z[i] - earth.z[i]) / distance_from_earth_to_tracer2
+
+			#		rl_dot_rl2 = r_l_hatX * r_b2_hatX + r_l_hatY * r_b2_hatY +  r_l_hatZ * r_b2_hatZ
+
+			#		theta2 = np.arccos(max(min(rl_dot_rs, 1), -1))
+
+			#		if theta2 < SA_of_tracer / distance_from_earth_to_tracer2: # don't know if this is right or not
+			#			b2.covered = TRUE
+
+total_SA = 0;
+SA_of_tracer = np.pi * 10**(-8)
+SA_blocked_at_step = np.zeros(N)
+j = 0
+for b in bodies:
+	for i in range(1, N, 100):
+		if b != earth and b != sun and b != l1 and not b.covered:
+			for b2 in bodies:
+				if b2 != earth and b2 != sun and b2 != l1 and b2 != b:
+						# Find whether or not the tracer particle blocked a ray from the sun to the earth
+						distance_from_earth_to_sun = np.sqrt((earth.x[i] - sun.x[i])**2 + (earth.y[i] - sun.y[i])**2 + (earth.z[i] - sun.z[i])**2)
+						distance_from_earth_to_tracer = np.sqrt((earth.x[i] - b.x[i])**2 + (earth.y[i] - b.y[i])**2 + (earth.z[i] - b.z[i])**2)
+
+						r_l_hatX = (b.x[i] - earth.x[i]) / distance_from_earth_to_tracer
+						r_l_hatY = (b.y[i] - earth.y[i]) / distance_from_earth_to_tracer
+						r_l_hatZ = (b.z[i] - earth.z[i]) / distance_from_earth_to_tracer
+
+						r_s_hatX = (sun.x[i] - earth.x[i]) / distance_from_earth_to_sun
+						r_s_hatY = (sun.y[i] - earth.y[i]) / distance_from_earth_to_sun
+						r_s_hatZ = (sun.z[i] - earth.z[i]) / distance_from_earth_to_sun
+
+						rl_dot_rs = r_l_hatX * r_s_hatX + r_l_hatY * r_s_hatY +  r_l_hatZ * r_s_hatZ
+
+						theta = np.arccos(max(min(rl_dot_rs, 1), -1))
+
+						if theta < 6.97e10 / distance_from_earth_to_sun:
+							SA_blocked_at_step[i] += SA_of_tracer
+
+						# if b is overlapping other tracers, mark them as covered
+						distance_from_earth_to_tracer2 = np.sqrt((earth.x[i] - b2.x[i])**2 + (earth.y[i] - b2.y[i])**2 + (earth.z[i] - b2.z[i])**2)
+
+						r_b2_hatX = (b2.x[i] - earth.x[i]) / distance_from_earth_to_tracer2
+						r_b2_hatY = (b2.y[i] - earth.y[i]) / distance_from_earth_to_tracer2
+						r_b2_hatZ = (b2.z[i] - earth.z[i]) / distance_from_earth_to_tracer2
+
+						rl_dot_rb2 = r_l_hatX * r_b2_hatX + r_l_hatY * r_b2_hatY +  r_l_hatZ * r_b2_hatZ
+
+						theta2 = np.arccos(max(min(rl_dot_rs, 1), -1))
+						j += 1
+						if theta2 < SA_of_tracer / distance_from_earth_to_tracer2: # don't know if this is right or not
+							b2.covered = True
+						
+
 
 print("Printing blocks:")
 print(blocks[::100])
+
+print("")
+print("Projected surface area of the earth: ", np.pi*630000000**2)
+print("Estimated surface area blocked by tracers: ", SA_blocked_at_step)
+
+
 
 xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(-1)
 print("Center of mass final: ", xc, yc, zc)
@@ -675,14 +739,19 @@ print("\nTracer particles' starting positions")
 ##print("sun.y:\t", sun.y[::5000])
 ##print("sun.z:\t", sun.z[::5000])
 
+readyToLabel = True
 plot1 = plt.figure(1)
 for b in bodies:
 	if b != earth and b != sun and b != l1:
-		plt.scatter(b.x, b.y, s = 1, c='gray')
-plt.scatter(earth.x, earth.y, s=2, label='earth')
-plt.scatter(sun.x, sun.y, s=2, label='sun')
+		if not readyToLabel:
+			plt.scatter(b.x, b.y, s = 1, c='red')
+		else:
+			plt.scatter(b.x, b.y, s = 1, c='red', label='Tracer particles')
+			readyToLabel = False
+plt.scatter(earth.x, earth.y, s=1, label='Earth')
+plt.scatter(sun.x, sun.y, s=4, label='Sun')
 #plt.scatter(l2.x, l2.y, s=1, label='l2')
-plt.scatter(l1.x, l1.y, s=2, label='l1')
+plt.scatter(l1.x, l1.y, s=1, label='L1')
 plt.legend(loc=1)
 
 plot2 = plt.figure(2)
@@ -694,6 +763,13 @@ for b in bodies:
 graph1.plot3D(earth.x, earth.y, earth.z)
 graph1.plot3D(sun.x, sun.y, sun.z)
 graph1.plot3D(l1.x, l1.y, l1.z)
+
+plot3 = plt.figure(3)
+plt.plot(np.linspace(0.0, 1.0, 100), blocks[::50], '.r-')
+plt.xlabel("Time (years)")
+plt.ylabel("% of tracer particles that block sunlight")
+plt.title("Blockage of sun rays due to tracer particles within a 1 km radius of L1")
+#plt.legend(loc=1)
 
 plt.savefig("C:/Users/khans/Desktop/UROP Spring 2022/plot.png")
 plt.show()

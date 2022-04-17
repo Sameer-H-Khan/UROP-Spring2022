@@ -5,6 +5,7 @@ class Body:
     tempx = 0
     tempy = 0
     tempz = 0
+    covered = False
 
     def __init__(self, mass, numberOfSteps, xi, yi, zi, vxi, vyi, vzi):
         self.mass = mass
