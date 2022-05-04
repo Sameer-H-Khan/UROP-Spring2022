@@ -2,7 +2,11 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import scipy.optimize as opt
+from matplotlib.animation import FuncAnimation
 from AstronomicalBody import Body
+import imageio
+import os
+
 
 G = 6.67408e-8
 N = 5000
@@ -537,7 +541,7 @@ bodies = np.array([earth, sun, l1])
 
 # Adding random tracer particles around l1
 for i in range(100):
-	radius = 100000
+	radius = 100000000
 	r = radius * ( np.random.random()**(1./3.) )  
 	phi = np.random.uniform(0,2*np.pi) 
 	costheta = np.random.uniform(-1,1) 
@@ -593,151 +597,82 @@ for b in bodies:
 			#		if theta2 < SA_of_tracer / distance_from_earth_to_tracer2: # don't know if this is right or not
 			#			b2.covered = TRUE
 
-total_SA = 0;
-SA_of_tracer = np.pi * 10**(-8)
-SA_blocked_at_step = np.zeros(N)
+
+
+
+anggrid = np.linspace(-0.3, 0.3, 100) * np.pi / 180
+ALPHA, BETA = np.meshgrid(anggrid, anggrid)
+betas = np.ones(100) * -99
+alphas = np.ones(100) * -99
 j = 0
-for b in bodies:
-	for i in range(1, N, 100):
-		if b != earth and b != sun and b != l1 and not b.covered:
-			for b2 in bodies:
-				if b2 != earth and b2 != sun and b2 != l1 and b2 != b:
-						# Find whether or not the tracer particle blocked a ray from the sun to the earth
-						distance_from_earth_to_sun = np.sqrt((earth.x[i] - sun.x[i])**2 + (earth.y[i] - sun.y[i])**2 + (earth.z[i] - sun.z[i])**2)
-						distance_from_earth_to_tracer = np.sqrt((earth.x[i] - b.x[i])**2 + (earth.y[i] - b.y[i])**2 + (earth.z[i] - b.z[i])**2)
 
-						r_l_hatX = (b.x[i] - earth.x[i]) / distance_from_earth_to_tracer
-						r_l_hatY = (b.y[i] - earth.y[i]) / distance_from_earth_to_tracer
-						r_l_hatZ = (b.z[i] - earth.z[i]) / distance_from_earth_to_tracer
+#def plotFrame(alphas, betas):
+#	msk = alphas > -99
+#	skymap, xedges, yedges = np.histogram2d(alphas[msk], betas[msk], bins=[anggrid, anggrid])
+#	xy = np.meshgrid(xedges, yedges)
 
-						r_s_hatX = (sun.x[i] - earth.x[i]) / distance_from_earth_to_sun
-						r_s_hatY = (sun.y[i] - earth.y[i]) / distance_from_earth_to_sun
-						r_s_hatZ = (sun.z[i] - earth.z[i]) / distance_from_earth_to_sun
-
-						rl_dot_rs = r_l_hatX * r_s_hatX + r_l_hatY * r_s_hatY +  r_l_hatZ * r_s_hatZ
-
-						theta = np.arccos(max(min(rl_dot_rs, 1), -1))
-
-						if theta < 6.97e10 / distance_from_earth_to_sun:
-							SA_blocked_at_step[i] += SA_of_tracer
-
-						# if b is overlapping other tracers, mark them as covered
-						distance_from_earth_to_tracer2 = np.sqrt((earth.x[i] - b2.x[i])**2 + (earth.y[i] - b2.y[i])**2 + (earth.z[i] - b2.z[i])**2)
-
-						r_b2_hatX = (b2.x[i] - earth.x[i]) / distance_from_earth_to_tracer2
-						r_b2_hatY = (b2.y[i] - earth.y[i]) / distance_from_earth_to_tracer2
-						r_b2_hatZ = (b2.z[i] - earth.z[i]) / distance_from_earth_to_tracer2
-
-						rl_dot_rb2 = r_l_hatX * r_b2_hatX + r_l_hatY * r_b2_hatY +  r_l_hatZ * r_b2_hatZ
-
-						theta2 = np.arccos(max(min(rl_dot_rs, 1), -1))
-						j += 1
-						if theta2 < SA_of_tracer / distance_from_earth_to_tracer2: # don't know if this is right or not
-							b2.covered = True
+for i in range(1, N, 100):
+	counter = 0
+	for b in bodies:
+		j = 0
+		if b != earth and b != sun and b != l1:
+			distance_from_earth_to_sun = np.sqrt((earth.x[i] - sun.x[i])**2 + (earth.y[i] - sun.y[i])**2 + (earth.z[i] - sun.z[i])**2)
+			distance_from_earth_to_tracer = np.sqrt((earth.x[i] - b.x[i])**2 + (earth.y[i] - b.y[i])**2 + (earth.z[i] - b.z[i])**2)
 						
+			s_hatX = (sun.x[i] - earth.x[i]) / distance_from_earth_to_sun
+			s_hatY = (sun.y[i] - earth.y[i]) / distance_from_earth_to_sun
+			s_hatZ = (sun.z[i] - earth.z[i]) / distance_from_earth_to_sun
 
+			r_hatX = (b.x[i] - earth.x[i]) / distance_from_earth_to_tracer
+			r_hatY = (b.y[i] - earth.y[i]) / distance_from_earth_to_tracer
+			r_hatZ = (b.z[i] - earth.z[i]) / distance_from_earth_to_tracer
+
+			betas[j] = beta = np.arcsin(r_hatZ)
+
+			rEq_hatX = r_hatX / np.sqrt(r_hatX**2 + r_hatY**2)
+			rEq_hatY = r_hatY / np.sqrt(r_hatX**2 + r_hatY**2)
+
+			alphas[j] = alpha = np.arccos(rEq_hatX * s_hatX + rEq_hatY * s_hatY)
+			theta = np.sqrt(alphas[j]**2 + betas[j]**2)
+
+			j+=1
+
+			if theta < 6.97e10 / distance_from_earth_to_sun:
+				counter += 1
+	print('Counter: ', counter)
+
+	msk = alphas > -99
+	print(np.max(alphas[msk]))
+	print(np.min(alphas[msk]))
+	print(np.max(betas[msk]))
+	print(np.min(betas[msk]))
+	print(np.sum(msk))
+	print(np.sum(np.isnan(alphas + betas)))
+	skymap, xedges, yedges = np.histogram2d(alphas[msk], betas[msk], bins=[anggrid, anggrid])
+	xy = np.meshgrid(xedges, yedges)
+	#skymap = np.where((xy[0] > 0.5 * np.pi / 180) & (xy[1] > 0.5 * np.pi / 180), 1, 0)
+	print(skymap.shape)
+	plt.imshow(skymap)
+
+	plt.savefig(f'frame-{i}.png')
+
+	#fig, ax = plt.subplots()
+	#ani = FuncAnimation(fig, plotFrame, frames=alphas, fargs = {betas}, blit=False)
+
+	plt.show()
+
+	#quit()
+
+with imageio.get_writer('frames.gif', mode='i') as writer:
+    for i in range(1, N, 100):
+        image = imageio.imread(f'frame-{i}.png')
+        writer.append_data(image)
+
+for i in range(1, N, 100):
+    os.remove(f'frame-{i}.png')
 
 print("Printing blocks:")
 print(blocks[::100])
-
-print("")
-print("Projected surface area of the earth: ", np.pi*630000000**2)
-print("Estimated surface area blocked by tracers: ", SA_blocked_at_step)
-
-
-
-xc, yc, zc, vxc, vyc, vzc = centerMassAndVelocity(-1)
-print("Center of mass final: ", xc, yc, zc)
-print("Center of velocity final: ", vxc, vyc, vzc)
-
-print(" ")
-print("###############")
-print("Earth initial position:\t", earth.x[0], earth.y[0], earth.z[0])
-print("L1 initial position:\t", l1.x[0], l1.y[0], l1.z[0])
-#print("L2 initial position:\t", l2.x[0], l2.y[0], l2.z[0])
-
-print("###############")
-print("Earth final position:\t", earth.x[-1], earth.y[-1], earth.z[-1])
-print("L1 final position:\t", l1.x[-1], l1.y[-1], l1.z[-1])
-#print("L2 final position:\t", l2.x[-1], l2.y[-1], l2.z[-1])
-
-print("\nTracer particles' starting positions")
-
-
-#print(" ")
-#print("**********Initially*********")
-#print("L1 Acceleration:\t", l1.ax[0], l1.ay[0], l1.az[0])
-#print("L2 Acceleration:\t", l2.ax[0], l2.ay[0], l2.az[0])
-#print("Earth Acceleration:\t", earth.ax[0], earth.ay[0], earth.az[0])
-#print(" ")
-#print("L1 angular velocity:\t", l1.vy[0]/l1.x[0])
-#print("L2 angular velocity:\t", l2.vy[0]/l2.x[0])
-#print("Earth angular velocity:\t", earth.vy[0]/earth.x[0])
-#print(" ")
-#print("L1 centripetal acc:\t", l1.vy[0]**2/l1.x[0])
-#print("L1 centripetal acc:\t", l2.vy[0]**2/l2.x[0])
-#print("Earth centripetal acc:\t", earth.vy[0]**2/earth.x[0])
-
-
-#print(" ")
-#print("**********After ", Years, " years *********")
-#print("L1 Acceleration:\t", l1.ax[-1], l1.ay[-1], l1.az[-1])
-#print("L2 Acceleration:\t", l2.ax[-1], l2.ay[-1], l2.az[-1])
-#print("Earth Acceleration:\t", earth.ax[-1], earth.ay[-1], earth.az[-1])
-#print(" ")
-#print("L1 angular velocity:\t", l1.vy[-1]/l1.x[-1])
-#print("L2 angular velocity:\t", l2.vy[-1]/l2.x[-1])
-#print("Earth angular velocity:\t", earth.vy[-1]/earth.x[-1])
-#print(" ")
-#print("L1 centripetal acc:\t", l1.vy[-1]**2/l1.x[-1])
-#print("L1 centripetal acc:\t", l2.vy[-1]**2/l2.x[-1])
-#print("Earth centripetal acc:\t", earth.vy[-1]**2/earth.x[-1])
-
-#earth_radius_arr = np.sqrt(earth.x**2 + earth.y**2 + earth.z**2)
-#earth_r_max = np.amax(earth_radius_arr)
-#earth_r_min = np.amin(earth_radius_arr)
-#print("")
-#print("Earth radius max:\t", earth_r_max)
-#print("Earth radius min:\t", earth_r_min)
-#print("Max - min:\t", earth_r_max - earth_r_min)
-#print("Hill radius:\t", np.cbrt(M[0]/(3*M[1])) * earth_r)
-#print("Max - min is ", (earth_r_max - earth_r_min)/(np.cbrt(M[0]/(3*M[1])) * earth_r), " of hill radius")
-
-
-#print("")
-
-#earth_v_dot_rhat = earth.vx * earth.x + earth.vy*earth.y + earth.vz + earth.z / earth.getR()
-#temp_vx = earth.vx - earth_v_dot_rhat * earth.x / earth.getR()
-#temp_vy = earth.vy - earth_v_dot_rhat * earth.y / earth.getR()
-#temp_vz = earth.vz - earth_v_dot_rhat * earth.z / earth.getR()
-#earth_v_tang = np.sqrt(temp_vx**2 + temp_vy**2 + temp_vz**2)
-
-#earth_angular = earth_v_tang / earth.getR()
-#print(earth_angular * 2*np.pi*np.sqrt(np.sqrt(earth.x[0]**2 + earth.y[0]**2 + earth.z[0]**2)**3/G/M[1]))
-##earth_angular = np.sqrt(earth.vx**2 + earth.vy**2 + earth.vz**2)/(np.sqrt(earth.x**2 + earth.y**2 + earth.z**2))
-#print("Earth_angular min: ", np.min(earth_angular))
-#print("Earth_angular max: ", np.max(earth_angular))
-#print("")
-#l1_angular = np.sqrt(l1.vx**2 + l1.vy**2 + l1.vz**2)/(np.sqrt(l1.x**2 + l1.y**2 + l1.z**2))
-#print("l1_angular min: ", np.min(l1_angular))
-#print("l1_angular max: ", np.max(l1_angular))
-#print("")
-#l2_angular = np.sqrt(l2.vx**2 + l2.vy**2 + l2.vz**2)/(np.sqrt(l2.x**2 + l2.y**2 + l2.z**2))
-#print("l2_angular min: ", np.min(l2_angular))
-#print("l2_angular max: ", np.max(l2_angular))
-
-##print("")
-##print("sun.ax:\t", sun.ax[::5000])
-##print("sun.ay:\t", sun.ay[::5000])
-##print("sun.az:\t", sun.az[::5000])
-##print("")
-##print("sun.vx:\t", sun.vx[::5000])
-##print("sun.vy:\t", sun.vy[::5000])
-##print("sun.vz:\t", sun.vz[::5000])
-##print("")
-##print("sun.x:\t", sun.x[::5000])
-##print("sun.y:\t", sun.y[::5000])
-##print("sun.z:\t", sun.z[::5000])
 
 readyToLabel = True
 plot1 = plt.figure(1)
